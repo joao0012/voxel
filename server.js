@@ -5,20 +5,15 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    cors: { origin: "*" }
-});
+const io = new Server(server, { cors: { origin: "*" } });
 
-// Serve os ficheiros estáticos da pasta 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Lista de jogadores conectados por sala
 const players = {};
 
 io.on('connection', (socket) => {
     console.log(`Jogador conectado: ${socket.id}`);
 
-    // Jogador entra no jogo
     socket.on('joinGame', (data) => {
         players[socket.id] = {
             id: socket.id,
@@ -27,23 +22,19 @@ io.on('connection', (socket) => {
             x: 0,
             y: 0.1,
             z: 4,
-            shirtColor: Math.random() * 0xffffff
+            shirtColor: data.shirtColor || 0x2563eb,
+            skinColor: data.skinColor || 0xfbcfe8,
+            isSitting: false,
+            seatPos: null
         };
 
-        // Coloca o socket na sala correta
         socket.join(players[socket.id].room);
-
-        // Envia a lista dos outros jogadores para quem acabou de entrar
         socket.emit('currentPlayers', getPlayersInRoom(players[socket.id].room));
-
-        // Avisa os outros jogadores na sala que um novo jogador entrou
         socket.to(players[socket.id].room).emit('playerJoined', players[socket.id]);
     });
 
-    // Mudança de sala
     socket.on('changeRoom', (newRoom) => {
         if (!players[socket.id]) return;
-
         const oldRoom = players[socket.id].room;
         socket.leave(oldRoom);
         socket.to(oldRoom).emit('playerLeft', socket.id);
@@ -51,17 +42,18 @@ io.on('connection', (socket) => {
         players[socket.id].room = newRoom;
         players[socket.id].x = 0;
         players[socket.id].z = 4;
+        players[socket.id].isSitting = false;
         socket.join(newRoom);
 
         socket.emit('currentPlayers', getPlayersInRoom(newRoom));
         socket.to(newRoom).emit('playerJoined', players[socket.id]);
     });
 
-    // Movimento do jogador
     socket.on('playerMove', (data) => {
         if (players[socket.id]) {
             players[socket.id].x = data.x;
             players[socket.id].z = data.z;
+            players[socket.id].isSitting = false;
             socket.to(players[socket.id].room).emit('playerMoved', {
                 id: socket.id,
                 x: data.x,
@@ -70,7 +62,21 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Mensagens de Chat e Balões
+    socket.on('playerSit', (data) => {
+        if (players[socket.id]) {
+            players[socket.id].isSitting = true;
+            players[socket.id].x = data.x;
+            players[socket.id].y = data.y;
+            players[socket.id].z = data.z;
+            io.to(players[socket.id].room).emit('playerSat', {
+                id: socket.id,
+                x: data.x,
+                y: data.y,
+                z: data.z
+            });
+        }
+    });
+
     socket.on('sendSpeech', (text) => {
         if (players[socket.id]) {
             io.to(players[socket.id].room).emit('playerSpeaks', {
@@ -80,7 +86,19 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Desconexão
+    // WebRTC Sinalização para o Microfone entre Jogadores
+    socket.on('语音-offer', (data) => {
+        socket.to(data.target).emit('语音-offer', { sender: socket.id, offer: data.offer });
+    });
+
+    socket.on('语音-answer', (data) => {
+        socket.to(data.target).emit('语音-answer', { sender: socket.id, answer: data.answer });
+    });
+
+    socket.on('语音-candidate', (data) => {
+        socket.to(data.target).emit('语音-candidate', { sender: socket.id, candidate: data.candidate });
+    });
+
     socket.on('disconnect', () => {
         console.log(`Jogador desconectado: ${socket.id}`);
         if (players[socket.id]) {
@@ -102,5 +120,5 @@ function getPlayersInRoom(room) {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Servidor Habbo Cristão a rodar na porta ${PORT}`);
+    console.log(`Servidor a rodar na porta ${PORT}`);
 });

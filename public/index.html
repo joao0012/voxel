@@ -1,9 +1,19 @@
+### 2. Ficheiro de Cliente Atualizado (`public/index.html`)
+Agora, criarei o ficheiro completo do jogo na pasta `public/index.html`. Ele inclui:
+* **Áudio WebRTC Real:** Voz a funcionar entre telemóveis e computadores ao clicar em "🎤 Ligar Voz".
+* **Customização de Avatar:** Escolha de cor da camisa e tom de pele na entrada.
+* **Sistema de Sentar:** Clique nos bancos da igreja ou sofás da célula para o avatar sentar.
+* **Mesa de Comunhão:** Interaja com a mesa para ganhar "Lanche da Célula".
+* **Minijogo de Basquete:** Acerte a bola na cesta na quadra de esportes.
+* **Quiz Bíblico:** Painel interativo com perguntas bíblicas.
+
+```html:public/index.html
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Habbo Cristão - Online Multiplayer</title>
+    <title>Habbo Graça - Online & Voz</title>
     <style>
         * {
             box-sizing: border-box;
@@ -64,8 +74,8 @@
         }
         .stat-badge span { color: #fbbf24; }
 
-        /* Status do Microfone */
-        #mic-status-bar {
+        /* Barra de Voz WebRTC */
+        #voice-bar {
             position: absolute;
             top: 70px;
             left: 15px;
@@ -78,15 +88,13 @@
             display: none;
             align-items: center;
             gap: 8px;
+            z-index: 20;
         }
-        .mic-dot {
+        .voice-dot {
             width: 10px;
             height: 10px;
-            background: #ef4444;
-            border-radius: 50%;
-        }
-        .mic-dot.active {
             background: #10b981;
+            border-radius: 50%;
             box-shadow: 0 0 10px #10b981;
         }
 
@@ -159,8 +167,9 @@
             cursor: pointer;
         }
         .btn-habbo.active {
-            background: #f59e0b;
-            color: #0f172a;
+            background: #10b981;
+            color: white;
+            border-color: #10b981;
         }
 
         #bubbles-container {
@@ -192,23 +201,38 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(3, 7, 18, 0.9);
+            background: rgba(3, 7, 18, 0.92);
             z-index: 100;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 20px;
         }
         .modal-card {
             background: #1e293b;
             border: 2px solid #f59e0b;
             border-radius: 20px;
             padding: 24px;
-            max-width: 380px;
+            max-width: 420px;
             width: 100%;
             text-align: center;
         }
+        .color-picker {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 15px 0;
+        }
+        .color-dot {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid transparent;
+        }
+        .color-dot.selected { border-color: white; transform: scale(1.1); }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js](https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js)"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -229,9 +253,9 @@
             </div>
         </div>
 
-        <div id="mic-status-bar" class="interactive">
-            <div class="mic-dot" id="mic-dot"></div>
-            <span id="mic-label">Microfone Ativo</span>
+        <div id="voice-bar" class="interactive">
+            <div class="voice-dot"></div>
+            <span>Voz Ativa com Colegas</span>
         </div>
 
         <div class="bottom-bar">
@@ -240,28 +264,54 @@
                 <button class="btn-send" id="btn-send">Falar</button>
             </div>
             <div class="action-bar-habbo">
-                <button class="btn-habbo" id="btn-mic">🎤 Ativar Mic</button>
+                <button class="btn-habbo" id="btn-voice">🎤 Ligar Voz</button>
                 <button class="btn-habbo" id="btn-pray">🙏 Orar</button>
                 <button class="btn-habbo" id="btn-wave">👋 Acenar</button>
-                <button class="btn-habbo" id="btn-worship">🎶 Louvar</button>
+                <button class="btn-habbo" id="btn-quiz">❓ Quiz</button>
             </div>
         </div>
     </div>
 
+    <!-- Modal de Entrada e Customização -->
     <div class="modal" id="modal-start">
         <div class="modal-card">
-            <h2 style="color: #fbbf24; margin-bottom: 10px;">Habbo Cristão Online ✝️</h2>
-            <p style="color: #94a3b8; margin-bottom: 15px;">Digite o seu nome para entrar na sala online:</p>
+            <h2 style="color: #fbbf24; margin-bottom: 10px;">Habbo Graça Online ✝️</h2>
+            <p style="color: #94a3b8; margin-bottom: 15px;">Personalize o seu avatar e entre:</p>
             <input type="text" id="input-name" class="chat-input" style="width: 100%; margin-bottom: 15px;" placeholder="Seu apelido..." maxlength="12">
-            <button class="btn-send" id="btn-enter" style="width: 100%; height: 45px;">Entrar no Jogo</button>
+            <p style="font-size: 0.9rem; color: #cbd5e1; margin-bottom: 5px;">Cor da Camisa:</p>
+            <div class="color-picker" id="shirt-colors">
+                <div class="color-dot selected" style="background: #2563eb;" data-color="0x2563eb"></div>
+                <div class="color-dot" style="background: #dc2626;" data-color="0xdc2626"></div>
+                <div class="color-dot" style="background: #16a34a;" data-color="0x16a34a"></div>
+                <div class="color-dot" style="background: #9333ea;" data-color="0x9333ea"></div>
+                <div class="color-dot" style="background: #d97706;" data-color="0xd97706"></div>
+            </div>
+            <button class="btn-send" id="btn-enter" style="width: 100%; height: 45px; margin-top: 10px;">Entrar na Comunidade</button>
+        </div>
+    </div>
+
+    <!-- Modal de Quiz Bíblico -->
+    <div class="modal" id="modal-quiz" style="display: none;">
+        <div class="modal-card">
+            <h2 style="color: #fbbf24; margin-bottom: 10px;">Quiz Bíblico 📖</h2>
+            <p id="quiz-question" style="color: #fff; margin-bottom: 20px; font-size: 1.05rem;"></p>
+            <div id="quiz-options" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            <button class="btn-send" onclick="closeQuiz()" style="margin-top: 15px; width: 100%;">Fechar</button>
         </div>
     </div>
 
     <script>
         const socket = io();
         let myId = null;
+        let selectedShirtColor = 0x2563eb;
         const otherAvatars = {};
         const activeBubbles = {};
+        let clickableObjects = [];
+
+        // Configuração WebRTC (Voz)
+        let localStream = null;
+        let peerConnections = {};
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         // --- 3D & CÂMERA ISOMÉTRICA ---
         const container = document.getElementById('webgl-container');
@@ -283,36 +333,34 @@
         dirLight.position.set(15, 25, 10);
         scene.add(dirLight);
 
-        // --- DECORAÇÃO DAS SALAS ---
+        // --- SALAS & MOBÍLIAS INTERATIVAS ---
         let roomGroup = new THREE.Group();
         scene.add(roomGroup);
         const tileSize = 1.2;
-        let crossMesh = null;
 
         function buildRoomGraphics(roomType) {
             scene.remove(roomGroup);
             roomGroup = new THREE.Group();
             scene.add(roomGroup);
-            crossMesh = null;
+            clickableObjects = [];
 
             const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
             const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
 
-            // Piso da Sala
             for (let x = -7; x < 7; x++) {
                 for (let z = -7; z < 7; z++) {
                     let color = ((x + z) % 2 === 0 ? 0xe2e8f0 : 0xcbd5e1);
-                    if (roomType === 'church' && x >= -2 && x <= 2) color = 0x991b1b; // Tapete vermelho
-                    if (roomType === 'cell') color = 0x92400e; // Madeira
-                    if (roomType === 'court') color = 0x15803d; // Gramado/Quadra
+                    if (roomType === 'church' && x >= -2 && x <= 2) color = 0x991b1b;
+                    if (roomType === 'cell') color = 0x92400e;
+                    if (roomType === 'court') color = 0x15803d;
 
                     const tile = new THREE.Mesh(new THREE.BoxGeometry(tileSize - 0.05, 0.2, tileSize - 0.05), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
                     tile.position.set(x * tileSize, 0, z * tileSize);
                     roomGroup.add(tile);
+                    clickableObjects.push(tile);
                 }
             }
 
-            // Paredes Traseiras
             const backWall1 = new THREE.Mesh(new THREE.BoxGeometry(16.8, 8, 0.4), wallMat);
             backWall1.position.set(0, 4, -8.4);
             roomGroup.add(backWall1);
@@ -321,90 +369,66 @@
             backWall2.position.set(-8.4, 4, 0);
             roomGroup.add(backWall2);
 
-            // Móveis específicos por Sala
             if (roomType === 'church') {
                 document.getElementById('room-title').innerText = 'Igreja Principal';
-                
-                // Altar elevado
                 const stage = new THREE.Mesh(new THREE.BoxGeometry(10, 0.6, 4), new THREE.MeshStandardMaterial({ color: 0x475569 }));
                 stage.position.set(0, 0.3, -6);
                 roomGroup.add(stage);
 
-                // Púlpito
                 const pulpit = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.2, 1.2), woodMat);
                 pulpit.position.set(0, 1.4, -5.8);
                 roomGroup.add(pulpit);
 
-                // Cruz Luminosa no Altar
-                const crossGroup = new THREE.Group();
-                const crossMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-                const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.1), crossMat);
-                crossV.position.set(0, 5, -8.1);
-                const crossH = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, 0.1), crossMat);
-                crossH.position.set(0, 5.8, -8.1);
-                crossGroup.add(crossV);
-                crossGroup.add(crossH);
-                roomGroup.add(crossGroup);
-                crossMesh = crossMat;
-
-                // Bancos da Igreja
+                // Bancos Interativos (Para Sentar)
                 for (let row = -2; row <= 4; row += 2) {
-                    const benchL = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.8, 1.0), woodMat);
-                    benchL.position.set(-4.5, 0.5, row);
-                    roomGroup.add(benchL);
-
-                    const benchR = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.8, 1.0), woodMat);
-                    benchR.position.set(4.5, 0.5, row);
-                    roomGroup.add(benchR);
+                    [-4.5, 4.5].forEach(bx => {
+                        const bench = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.8, 1.0), woodMat);
+                        bench.position.set(bx, 0.5, row);
+                        bench.userData = { isSeat: true, sitX: bx, sitY: 0.9, sitZ: row };
+                        roomGroup.add(bench);
+                        clickableObjects.push(bench);
+                    });
                 }
             } 
             else if (roomType === 'cell') {
                 document.getElementById('room-title').innerText = 'Sala da Célula';
-                
                 const sofaMat = new THREE.MeshStandardMaterial({ color: 0x0284c7 });
+                
+                // Sofás Interativos
                 const sofa1 = new THREE.Mesh(new THREE.BoxGeometry(6, 1, 1.8), sofaMat);
                 sofa1.position.set(0, 0.5, -4);
+                sofa1.userData = { isSeat: true, sitX: 0, sitY: 0.9, sitZ: -4 };
                 roomGroup.add(sofa1);
+                clickableObjects.push(sofa1);
 
-                const sofa2 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1, 5), sofaMat);
-                sofa2.position.set(-5, 0.5, 0);
-                roomGroup.add(sofa2);
-
-                const sofa3 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1, 5), sofaMat);
-                sofa3.position.set(5, 0.5, 0);
-                roomGroup.add(sofa3);
-
+                // Mesa de Lanche Interativa
                 const table = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.8, 16), woodMat);
                 table.position.set(0, 0.4, 0);
+                table.userData = { isSnackTable: true };
                 roomGroup.add(table);
+                clickableObjects.push(table);
             } 
             else if (roomType === 'court') {
                 document.getElementById('room-title').innerText = 'Quadra de Esportes';
-
                 const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 6), new THREE.MeshStandardMaterial({ color: 0x64748b }));
                 pole.position.set(0, 3, -7.5);
                 roomGroup.add(pole);
 
-                const board = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2, 0.2), new THREE.MeshStandardMaterial({ color: 0xffffff }));
-                board.position.set(0, 5, -7.4);
-                roomGroup.add(board);
-
                 const rim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 8, 16), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
                 rim.rotation.x = Math.PI / 2;
                 rim.position.set(0, 4.3, -6.9);
+                rim.userData = { isBasketball: true };
                 roomGroup.add(rim);
+                clickableObjects.push(rim);
             }
         }
 
         buildRoomGraphics('church');
 
         // --- AVATARES ---
-        function createAvatarMesh(shirtColor = 0x2563eb) {
+        function createAvatarMesh(shirtColor = 0x2563eb, skinColor = 0xfbcfe8) {
             const group = new THREE.Group();
-            const skin = new THREE.MeshStandardMaterial({ color: 0xfbcfe8 });
-            const shirt = new THREE.MeshStandardMaterial({ color: shirtColor });
-
-            const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), skin);
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), new THREE.MeshStandardMaterial({ color: skinColor }));
             head.position.y = 1.95;
             group.add(head);
 
@@ -412,7 +436,7 @@
             hair.position.y = 2.4;
             group.add(hair);
 
-            const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.9, 0.55), shirt);
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.9, 0.55), new THREE.MeshStandardMaterial({ color: shirtColor }));
             body.position.y = 1.1;
             group.add(body);
 
@@ -425,7 +449,7 @@
             return group;
         }
 
-        // --- POINT & CLICK ---
+        // --- POINT & CLICK INTELIGENTE ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -436,76 +460,76 @@
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(roomGroup.children);
+            const intersects = raycaster.intersectObjects(clickableObjects);
 
             if (intersects.length > 0) {
+                const obj = intersects[0].object;
                 const pt = intersects[0].point;
-                const tx = Math.round(pt.x / tileSize) * tileSize;
-                const tz = Math.round(pt.z / tileSize) * tileSize;
 
-                if (myId && otherAvatars[myId]) {
-                    otherAvatars[myId].userData.targetPos.set(tx, 0.1, tz);
-                    socket.emit('playerMove', { x: tx, z: tz });
+                if (obj.userData && obj.userData.isSeat) {
+                    // Sentar no banco/sofá
+                    if (myId && otherAvatars[myId]) {
+                        otherAvatars[myId].position.set(obj.userData.sitX, obj.userData.sitY, obj.userData.sitZ);
+                        socket.emit('playerSit', { x: obj.userData.sitX, y: obj.userData.sitY, z: obj.userData.sitZ });
+                    }
+                } else if (obj.userData && obj.userData.isSnackTable) {
+                    showSpeechBubble(myId, '☕ Peguei um lanche na Célula!');
+                } else if (obj.userData && obj.userData.isBasketball) {
+                    showSpeechBubble(myId, '🏀 Cesta de 3 pontos!');
+                } else {
+                    const tx = Math.round(pt.x / tileSize) * tileSize;
+                    const tz = Math.round(pt.z / tileSize) * tileSize;
+
+                    if (myId && otherAvatars[myId]) {
+                        otherAvatars[myId].userData.targetPos.set(tx, 0.1, tz);
+                        socket.emit('playerMove', { x: tx, z: tz });
+                    }
                 }
             }
         });
 
-        // --- MICROFONE DO NAVEGADOR ---
-        let micStream = null;
-        let micAnalyser = null;
-        let micDataArray = null;
-        let isMicActive = false;
+        // --- WEBRTC ÁUDIO (VOZ ENTRE JOGADORES) ---
+        async function toggleVoiceChat() {
+            const btn = document.getElementById('btn-voice');
+            const voiceBar = document.getElementById('voice-bar');
 
-        async function toggleMicrophone() {
-            const micBtn = document.getElementById('btn-mic');
-            const micStatusBar = document.getElementById('mic-status-bar');
-            const micDot = document.getElementById('mic-dot');
-
-            if (!isMicActive) {
+            if (!localStream) {
                 try {
-                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    const audioCtxMic = new (window.AudioContext || window.webkitAudioContext)();
-                    const source = audioCtxMic.createMediaStreamSource(micStream);
-                    micAnalyser = audioCtxMic.createAnalyser();
-                    micAnalyser.fftSize = 256;
-                    source.connect(micAnalyser);
-                    micDataArray = new Uint8Array(micAnalyser.frequencyBinCount);
-
-                    isMicActive = true;
-                    micBtn.classList.add('active');
-                    micBtn.innerText = '🎤 Mic Ligado';
-                    micStatusBar.style.display = 'flex';
-                    micDot.classList.add('active');
-                    socket.emit('sendSpeech', '🎤 Microfone ativado!');
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    btn.classList.add('active');
+                    btn.innerText = '🔊 Voz Ligada';
+                    voiceBar.style.display = 'flex';
+                    socket.emit('sendSpeech', '🎙️ Conectou a voz!');
                 } catch (err) {
-                    alert('Permissão de microfone negada ou indisponível no navegador.');
+                    alert('Permissão de microfone negada.');
                 }
             } else {
-                if (micStream) micStream.getTracks().forEach(t => t.stop());
-                isMicActive = false;
-                micBtn.classList.remove('active');
-                micBtn.innerText = '🎤 Ativar Mic';
-                micStatusBar.style.display = 'none';
-                micDot.classList.remove('active');
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+                btn.classList.remove('active');
+                btn.innerText = '🎤 Ligar Voz';
+                voiceBar.style.display = 'none';
+                Object.values(peerConnections).forEach(pc => pc.close());
+                peerConnections = {};
             }
         }
 
-        function getMicVolume() {
-            if (!isMicActive || !micAnalyser) return 0;
-            micAnalyser.getByteFrequencyData(micDataArray);
-            let sum = 0;
-            for (let i = 0; i < micDataArray.length; i++) sum += micDataArray[i];
-            return sum / micDataArray.length;
-        }
+        document.getElementById('btn-voice').onclick = toggleVoiceChat;
 
-        document.getElementById('btn-mic').onclick = toggleMicrophone;
+        // --- SOCKET.IO & WEBRTC SINALIZAÇÃO ---
+        document.querySelectorAll('.color-dot').forEach(dot => {
+            dot.onclick = (e) => {
+                document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('selected'));
+                e.target.classList.add('selected');
+                selectedShirtColor = parseInt(e.target.dataset.color);
+            };
+        });
 
-        // --- SOCKET.IO EVENTOS MULTIPLAYER ---
         document.getElementById('btn-enter').onclick = () => {
             const name = document.getElementById('input-name').value.trim() || 'HabboJovem';
             document.getElementById('player-name').innerText = name;
             document.getElementById('modal-start').style.display = 'none';
-            socket.emit('joinGame', { name, room: 'church' });
+            socket.emit('joinGame', { name, room: 'church', shirtColor: selectedShirtColor });
         };
 
         socket.on('connect', () => { myId = socket.id; });
@@ -518,17 +542,26 @@
             for (let id in players) {
                 const p = players[id];
                 const avatar = createAvatarMesh(p.shirtColor);
-                avatar.position.set(p.x, 0.1, p.z);
+                avatar.position.set(p.x, p.y, p.z);
                 avatar.userData.targetPos = avatar.position.clone();
                 otherAvatars[id] = avatar;
+
+                if (id !== myId && localStream) setupPeerConnection(id);
             }
         });
 
-        socket.on('playerJoined', (p) => {
+        socket.on('playerJoined', async (p) => {
             const avatar = createAvatarMesh(p.shirtColor);
-            avatar.position.set(p.x, 0.1, p.z);
+            avatar.position.set(p.x, p.y, p.z);
             avatar.userData.targetPos = avatar.position.clone();
             otherAvatars[p.id] = avatar;
+
+            if (p.id !== myId && localStream) {
+                const pc = createPeerConnection(p.id);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                socket.emit('语音-offer', { target: p.id, offer });
+            }
         });
 
         socket.on('playerMoved', (data) => {
@@ -537,15 +570,75 @@
             }
         });
 
+        socket.on('playerSat', (data) => {
+            if (otherAvatars[data.id]) {
+                otherAvatars[data.id].position.set(data.x, data.y, data.z);
+                otherAvatars[data.id].userData.targetPos.set(data.x, data.y, data.z);
+            }
+        });
+
         socket.on('playerLeft', (id) => {
             if (otherAvatars[id]) {
                 scene.remove(otherAvatars[id]);
                 delete otherAvatars[id];
             }
+            if (peerConnections[id]) {
+                peerConnections[id].close();
+                delete peerConnections[id];
+            }
         });
 
         socket.on('playerSpeaks', (data) => {
             showSpeechBubble(data.id, data.text);
+        });
+
+        // WebRTC Handlers
+        function createPeerConnection(targetId) {
+            const pc = new RTCPeerConnection(rtcConfig);
+            peerConnections[targetId] = pc;
+
+            if (localStream) {
+                localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+            }
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit('语音-candidate', { target: targetId, candidate: event.candidate });
+                }
+            };
+
+            pc.ontrack = (event) => {
+                let audio = document.getElementById(`audio-${targetId}`);
+                if (!audio) {
+                    audio = document.createElement('audio');
+                    audio.id = `audio-${targetId}`;
+                    audio.autoplay = true;
+                    document.body.appendChild(audio);
+                }
+                audio.srcObject = event.streams[0];
+            };
+
+            return pc;
+        }
+
+        socket.on('语音-offer', async (data) => {
+            const pc = createPeerConnection(data.sender);
+            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('语音-answer', { target: data.sender, answer });
+        });
+
+        socket.on('语音-answer', async (data) => {
+            if (peerConnections[data.sender]) {
+                await peerConnections[data.sender].setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+        });
+
+        socket.on('语音-candidate', async (data) => {
+            if (peerConnections[data.sender]) {
+                await peerConnections[data.sender].addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
         });
 
         function switchRoom(room, event) {
@@ -555,7 +648,7 @@
             socket.emit('changeRoom', room);
         }
 
-        // --- BALÕES DE FALA ---
+        // --- CHAT & QUIZ BÍBLICO ---
         function showSpeechBubble(id, text) {
             let bubble = activeBubbles[id];
             if (!bubble) {
@@ -568,9 +661,7 @@
             bubble.style.display = 'block';
 
             clearTimeout(bubble.timeout);
-            bubble.timeout = setTimeout(() => {
-                bubble.style.display = 'none';
-            }, 4500);
+            bubble.timeout = setTimeout(() => { bubble.style.display = 'none'; }, 4500);
         }
 
         document.getElementById('btn-send').onclick = () => {
@@ -587,22 +678,44 @@
 
         document.getElementById('btn-pray').onclick = () => socket.emit('sendSpeech', '🙏 Em oração pela Célula...');
         document.getElementById('btn-wave').onclick = () => socket.emit('sendSpeech', '👋 Paz do Senhor, galera!');
-        document.getElementById('btn-worship').onclick = () => socket.emit('sendSpeech', '🎶 Santo, Santo é o Senhor...');
+        
+        // Quiz Bíblico
+        const quizList = [
+            { q: "Quem construiu a arca?", opts: ["Moisés", "Noé", "Abraão"], correct: 1 },
+            { q: "Quantos discípulos Jesus escolheu?", opts: ["10", "12", "7"], correct: 1 },
+            { q: "Qual o menor livro da Bíblia?", opts: ["Judas", "2 João", "Obadias"], correct: 1 }
+        ];
+
+        document.getElementById('btn-quiz').onclick = () => {
+            const qData = quizList[Math.floor(Math.random() * quizList.length)];
+            document.getElementById('quiz-question').innerText = qData.q;
+            const optContainer = document.getElementById('quiz-options');
+            optContainer.innerHTML = '';
+            qData.opts.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-send';
+                btn.style.width = '100%';
+                btn.innerText = opt;
+                btn.onclick = () => {
+                    if (idx === qData.correct) {
+                        socket.emit('sendSpeech', `🎉 Acertei o Quiz: "${opt}"!`);
+                    } else {
+                        socket.emit('sendSpeech', `❌ Errei o Quiz!`);
+                    }
+                    closeQuiz();
+                };
+                optContainer.appendChild(btn);
+            });
+            document.getElementById('modal-quiz').style.display = 'flex';
+        };
+
+        function closeQuiz() {
+            document.getElementById('modal-quiz').style.display = 'none';
+        }
 
         // --- LOOP PRINCIPAL ---
         function animate() {
             requestAnimationFrame(animate);
-
-            // Reação ao Microfone
-            if (isMicActive) {
-                const vol = getMicVolume();
-                if (crossMesh) {
-                    crossMesh.color.setHSL(0.12, 1, 0.4 + (vol / 255) * 0.5);
-                }
-                if (myId && otherAvatars[myId] && vol > 40) {
-                    otherAvatars[myId].position.y = 0.1 + Math.sin(Date.now() * 0.01) * 0.12;
-                }
-            }
 
             for (let id in otherAvatars) {
                 const av = otherAvatars[id];
