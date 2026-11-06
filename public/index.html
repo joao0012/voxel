@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Habbo Cristão - Online Multiplayer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            margin: 0;
+            padding: 0;
+            touch-action: manipulation;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: #0f172a;
+            color: white;
+        }
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px;
+        }
+        .interactive { pointer-events: auto; }
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .habbo-card {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 2px solid #f59e0b;
+            border-radius: 14px;
+            padding: 8px 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .stat-badge {
+            font-weight: 800;
+            font-size: 0.9rem;
+        }
+        .stat-badge span { color: #fbbf24; }
+
+        .room-selector {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-room {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid #f59e0b;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .btn-room.active {
+            background: #f59e0b;
+            color: #0f172a;
+        }
+
+        .bottom-bar {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            pointer-events: auto;
+        }
+        .chat-container {
+            display: flex;
+            width: 100%;
+            max-width: 500px;
+            gap: 8px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 12px 18px;
+            border-radius: 25px;
+            border: 2px solid #f59e0b;
+            background: rgba(15, 23, 42, 0.9);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+        }
+        .btn-send {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border: none;
+            color: #0f172a;
+            font-weight: 800;
+            padding: 0 20px;
+            border-radius: 25px;
+            cursor: pointer;
+        }
+        .action-bar-habbo {
+            display: flex;
+            gap: 8px;
+        }
+        .btn-habbo {
+            background: rgba(30, 41, 59, 0.9);
+            border: 2px solid rgba(245, 158, 11, 0.6);
+            color: #fbbf24;
+            padding: 8px 14px;
+            border-radius: 16px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        /* Container de Balões de Fala */
+        #bubbles-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .speech-bubble {
+            position: absolute;
+            background: white;
+            color: #0f172a;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            border: 2px solid #cbd5e1;
+            transform: translate(-50%, -100%);
+            white-space: nowrap;
+        }
+
+        .modal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(3, 7, 18, 0.9);
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-card {
+            background: #1e293b;
+            border: 2px solid #f59e0b;
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 380px;
+            width: 100%;
+            text-align: center;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="webgl-container"></div>
+    <div id="bubbles-container"></div>
+
+    <div id="ui-layer">
+        <div class="top-bar">
+            <div class="habbo-card interactive">
+                <div class="stat-badge">👤 <span id="player-name">HabboJovem</span></div>
+                <div class="stat-badge">📍 <span id="room-title">Igreja Principal</span></div>
+            </div>
+
+            <div class="room-selector interactive">
+                <button class="btn-room active" onclick="switchRoom('church')">⛪ Igreja</button>
+                <button class="btn-room" onclick="switchRoom('cell')">🏠 Célula</button>
+                <button class="btn-room" onclick="switchRoom('court')">🏀 Quadra</button>
+            </div>
+        </div>
+
+        <div class="bottom-bar">
+            <div class="chat-container">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Digite uma mensagem..." maxlength="40">
+                <button class="btn-send" id="btn-send">Falar</button>
+            </div>
+            <div class="action-bar-habbo">
+                <button class="btn-habbo" id="btn-pray">🙏 Orar</button>
+                <button class="btn-habbo" id="btn-wave">👋 Acenar</button>
+                <button class="btn-habbo" id="btn-worship">🎶 Louvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-start">
+        <div class="modal-card">
+            <h2 style="color: #fbbf24; margin-bottom: 10px;">Habbo Cristão Online ✝️</h2>
+            <p style="color: #94a3b8; margin-bottom: 15px;">Digite o seu nome para entrar na sala online:</p>
+            <input type="text" id="input-name" class="chat-input" style="width: 100%; margin-bottom: 15px;" placeholder="Seu apelido..." maxlength="12">
+            <button class="btn-send" id="btn-enter" style="width: 100%; height: 45px;">Entrar no Jogo</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let myId = null;
+        const otherAvatars = {};
+        const activeBubbles = {};
+
+        // --- 3D & CÂMERA ISOMÉTRICA ---
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a);
+
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 14;
+        const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+        camera.position.set(20, 20, 20);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.9);
+        dirLight.position.set(15, 25, 10);
+        scene.add(dirLight);
+
+        // --- SALAS ---
+        let roomGroup = new THREE.Group();
+        scene.add(roomGroup);
+        const tileSize = 1.2;
+
+        function buildRoomGraphics(roomType) {
+            scene.remove(roomGroup);
+            roomGroup = new THREE.Group();
+            scene.add(roomGroup);
+
+            const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+
+            for (let x = -7; x < 7; x++) {
+                for (let z = -7; z < 7; z++) {
+                    let color = ((x + z) % 2 === 0 ? 0xe2e8f0 : 0xcbd5e1);
+                    if (roomType === 'church' && x >= -2 && x <= 2) color = 0x991b1b;
+                    if (roomType === 'cell') color = 0x92400e;
+                    if (roomType === 'court') color = 0x15803d;
+
+                    const tile = new THREE.Mesh(new THREE.BoxGeometry(tileSize - 0.05, 0.2, tileSize - 0.05), new THREE.MeshStandardMaterial({ color }));
+                    tile.position.set(x * tileSize, 0, z * tileSize);
+                    roomGroup.add(tile);
+                }
+            }
+
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(16.8, 8, 0.4), wallMat);
+            backWall.position.set(0, 4, -8.4);
+            roomGroup.add(backWall);
+
+            if (roomType === 'church') {
+                document.getElementById('room-title').innerText = 'Igreja Principal';
+                const cross = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4, 0.1), new THREE.MeshBasicMaterial({ color: 0xf59e0b }));
+                cross.position.set(0, 5, -8);
+                roomGroup.add(cross);
+            }
+        }
+
+        buildRoomGraphics('church');
+
+        // --- AVATARES ---
+        function createAvatarMesh(shirtColor = 0x2563eb) {
+            const group = new THREE.Group();
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.9, 0.9), new THREE.MeshStandardMaterial({ color: 0xfbcfe8 }));
+            head.position.y = 1.95;
+            group.add(head);
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.9, 0.55), new THREE.MeshStandardMaterial({ color: shirtColor }));
+            body.position.y = 1.1;
+            group.add(body);
+
+            const legs = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.5), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+            legs.position.y = 0.35;
+            group.add(legs);
+
+            group.userData = { targetPos: group.position.clone() };
+            scene.add(group);
+            return group;
+        }
+
+        // --- POINT & CLICK ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('pointerdown', (e) => {
+            if (e.target.closest('#ui-layer') && !e.target.classList.contains('interactive')) return;
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(roomGroup.children);
+
+            if (intersects.length > 0) {
+                const pt = intersects[0].point;
+                const tx = Math.round(pt.x / tileSize) * tileSize;
+                const tz = Math.round(pt.z / tileSize) * tileSize;
+
+                if (myId && otherAvatars[myId]) {
+                    otherAvatars[myId].userData.targetPos.set(tx, 0.1, tz);
+                    socket.emit('playerMove', { x: tx, z: tz });
+                }
+            }
+        });
+
+        // --- SOCKET.IO EVENTOS ---
+        document.getElementById('btn-enter').onclick = () => {
+            const name = document.getElementById('input-name').value.trim() || 'HabboJovem';
+            document.getElementById('player-name').innerText = name;
+            document.getElementById('modal-start').style.display = 'none';
+
+            socket.emit('joinGame', { name, room: 'church' });
+        };
+
+        socket.on('connect', () => { myId = socket.id; });
+
+        socket.on('currentPlayers', (players) => {
+            for (let id in otherAvatars) {
+                scene.remove(otherAvatars[id]);
+                delete otherAvatars[id];
+            }
+            for (let id in players) {
+                const p = players[id];
+                const avatar = createAvatarMesh(p.shirtColor);
+                avatar.position.set(p.x, 0.1, p.z);
+                avatar.userData.targetPos = avatar.position.clone();
+                otherAvatars[id] = avatar;
+            }
+        });
+
+        socket.on('playerJoined', (p) => {
+            const avatar = createAvatarMesh(p.shirtColor);
+            avatar.position.set(p.x, 0.1, p.z);
+            avatar.userData.targetPos = avatar.position.clone();
+            otherAvatars[p.id] = avatar;
+        });
+
+        socket.on('playerMoved', (data) => {
+            if (otherAvatars[data.id]) {
+                otherAvatars[data.id].userData.targetPos.set(data.x, 0.1, data.z);
+            }
+        });
+
+        socket.on('playerLeft', (id) => {
+            if (otherAvatars[id]) {
+                scene.remove(otherAvatars[id]);
+                delete otherAvatars[id];
+            }
+        });
+
+        socket.on('playerSpeaks', (data) => {
+            showSpeechBubble(data.id, data.text);
+        });
+
+        function switchRoom(room) {
+            document.querySelectorAll('.btn-room').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            buildRoomGraphics(room);
+            socket.emit('changeRoom', room);
+        }
+
+        // --- BALÕES DE FALA MULTIPLAYER ---
+        function showSpeechBubble(id, text) {
+            let bubble = activeBubbles[id];
+            if (!bubble) {
+                bubble = document.createElement('div');
+                bubble.className = 'speech-bubble';
+                document.getElementById('bubbles-container').appendChild(bubble);
+                activeBubbles[id] = bubble;
+            }
+            bubble.innerText = text;
+            bubble.style.display = 'block';
+
+            clearTimeout(bubble.timeout);
+            bubble.timeout = setTimeout(() => {
+                bubble.style.display = 'none';
+            }, 4500);
+        }
+
+        document.getElementById('btn-send').onclick = () => {
+            const input = document.getElementById('chat-input');
+            if (input.value.trim() !== '') {
+                socket.emit('sendSpeech', input.value);
+                input.value = '';
+            }
+        };
+
+        document.getElementById('btn-pray').onclick = () => socket.emit('sendSpeech', '🙏 Em oração pela Célula...');
+        document.getElementById('btn-wave').onclick = () => socket.emit('sendSpeech', '👋 Paz do Senhor, galera!');
+        document.getElementById('btn-worship').onclick = () => socket.emit('sendSpeech', '🎶 Santo, Santo é o Senhor...');
+
+        // --- ANIMATE ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            for (let id in otherAvatars) {
+                const av = otherAvatars[id];
+                if (av.position.distanceTo(av.userData.targetPos) > 0.1) {
+                    const dir = av.userData.targetPos.clone().sub(av.position).normalize();
+                    av.position.add(dir.multiplyScalar(0.12));
+                    av.rotation.y = Math.atan2(dir.x, dir.z);
+                }
+
+                if (activeBubbles[id] && activeBubbles[id].style.display === 'block') {
+                    const vec = av.position.clone().add(new THREE.Vector3(0, 2.8, 0));
+                    vec.project(camera);
+                    const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+                    const y = (-(vec.y * 0.5) + 0.5) * window.innerHeight;
+                    activeBubbles[id].style.left = `${x}px`;
+                    activeBubbles[id].style.top = `${y}px`;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
